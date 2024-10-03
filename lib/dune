@@ -1,0 +1,21 @@
+(library
+ (name ocaml_monome)
+ (ctypes
+  (external_library_name libmonome)
+  (build_flags_resolver
+   (vendored
+    (c_library_flags
+     (-L/usr/local/liv -lmonome))
+    (c_flags -I/usr/local/include)))
+  (headers
+   (include "monome.h"))
+  (type_description
+   (instance Type)
+   (functor Type_description))
+  (function_description
+   (concurrency sequential)
+   (instance Functions)
+   (functor function_description))
+  (generated_types Types_generated)
+  (generated_entry_point Lib_monome))
+ (libraries core ctypes))
