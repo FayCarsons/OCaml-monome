@@ -67,7 +67,14 @@ module Types (F : Ctypes.TYPE) = struct
   let event : event_t structure typ = typedef (structure "monome_event") "monome_event_t"
   let device = field event "monome" monome
   let tag = field event "event_type" event_t
-  (* How tf do I add an anonymous union field ????????????? *)
+  let grid_x = field event "grid.x" uint
+  let grid_y = field event "grid.y" uint
+  let encoder_number = field event "encoder.number" uint
+  let encoder_delta = field event "encoder.delta" int
+  let tilt_sensor = field event "tilt.sensor" uint
+  let tilt_x = field event "tilt.x" int
+  let tilt_y = field event "tilt.y" int
+  let tilt_z = field event "tilt.z" int
 
   type event_handler
 
