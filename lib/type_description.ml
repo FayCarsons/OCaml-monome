@@ -1,8 +1,10 @@
 open Ctypes
+open Foreign
 
 module Types (F : Ctypes.TYPE) = struct
   open F
 
+  let default_udp_address = "osc.udp://127.0.0.1:8080/monome"
   let button_up = constant "MONOME_BUTTON_UP" int64_t
   let button_down = constant "MONOME_BUTTON_DOWN" int64_t
   let encoder_delta = constant "MONOME_ENCODER_DELTA" int64_t
@@ -42,13 +44,13 @@ module Types (F : Ctypes.TYPE) = struct
   let d180 = constant "MONOME_ROTATE_180" int64_t
   let d270 = constant "MONOME_ROTATE_270" int64_t
 
-  type rotate =
+  type rotation =
     | No_turn
     | Quarter_turn
     | Half_turn
     | Three_quarter_turn
 
-  let rotate =
+  let rotation =
     enum
       "monome_rotate_t"
       [ No_turn, d0; Quarter_turn, d90; Half_turn, d180; Three_quarter_turn, d270 ]
@@ -75,12 +77,12 @@ module Types (F : Ctypes.TYPE) = struct
   let tilt_x = field event "tilt.x" int
   let tilt_y = field event "tilt.y" int
   let tilt_z = field event "tilt.z" int
+  let _ = seal event
 
   type event_handler
 
   let event_handler =
-    typedef
-      (static_funptr (ptr (const monome) @-> ptr void @-> returning void))
-      "monome_event_callback_t"
+    let handler_sig = ptr (const event) @-> ptr void @-> returning void in
+    funptr handler_sig ~name:"monome_event_callback_t"
   ;;
 end

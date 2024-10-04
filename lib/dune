@@ -1,12 +1,12 @@
 (library
- (name ocaml_monome)
+ (name monome)
  (ctypes
-  (external_library_name libmonome)
+  (external_library_name libmonome.1.4.8)
   (build_flags_resolver
    (vendored
     (c_library_flags
-     (-L/usr/local/liv -lmonome))
-    (c_flags -I/usr/local/include)))
+     (-L/usr/local/opt/libmonome/lib/ -lmonome -static))
+    (c_flags -I/usr/local/opt/libmonome/include/)))
   (headers
    (include "monome.h"))
   (type_description
@@ -18,4 +18,9 @@
    (functor function_description))
   (generated_types Types_generated)
   (generated_entry_point Lib_monome))
- (libraries core ctypes))
+ (libraries core ctypes ctypes.foreign))
+
+(env
+ (dev
+  (flags
+   (:standard -ccopt -mmacosx-version-min=12.7))))
