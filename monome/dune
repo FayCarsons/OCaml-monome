@@ -1,0 +1,4 @@
+(library
+ (name monome)
+ (public_name monome)
+ (libraries core eio eio_main osc unix cstruct))
