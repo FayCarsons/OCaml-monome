@@ -48,16 +48,20 @@ let string_of_addr : Net.Sockaddr.datagram -> string = function
   | _ -> assert false
 ;;
 
+exception Ports_exhausted
+
 let find_free_port ~sw ~net =
   let rec go = function
-    | 0l -> Error "Could not bind socket: ports exhausted"
+    | 0l ->
+      Switch.fail sw Ports_exhausted;
+      assert false
     | port ->
       (try
          let addr = `Udp (Net.Ipaddr.V4.loopback, Int32.to_int_trunc port) in
          let socket =
            Net.datagram_socket ~reuse_addr:true ~reuse_port:true ~sw net addr
          in
-         Ok (Transport.create port addr socket)
+         Transport.create port addr socket
        with
        | _ -> go (Int32.succ port))
   in

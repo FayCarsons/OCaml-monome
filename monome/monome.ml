@@ -155,38 +155,36 @@ module Monome = struct
         traceln "Received an unexpected bundle in 'register_device_changed_callback'";
         None
     in
-    match Connection.find_free_port ~sw ~net with
-    | Ok transport ->
-      Eio.Fiber.fork ~sw (fun () ->
-        let server_port = transport.port in
-        let message =
-          buf_of_osc_message
-            ~address:"/serialosc/notify"
-            Osc.Types.[ String "127.0.0.1"; Int32 server_port ]
-        in
-        let recv_buf = Cstruct.create 1024 in
-        let rec loop need_notify =
-          if need_notify
-          then (
-            Net.send transport.socket ~dst:(`Udp (host, port)) [ message ];
-            recv transport.socket recv_buf)
-        and recv socket buff =
-          let _ = Net.recv socket buff in
-          let s = Cstruct.to_string buff in
-          match Osc.Codec.to_packet s with
-          | Ok packet ->
-            (match decode packet with
-             | Some (Added _ as event) ->
-               callback event;
-               loop true
-             | Some removed ->
-               callback removed;
-               loop false
-             | None -> loop false)
-          | Error _ -> loop false
-        in
-        loop true)
-    | Error e -> Switch.fail sw (Failure e)
+    let transport = Connection.find_free_port ~sw ~net in
+    Eio.Fiber.fork ~sw (fun () ->
+      let server_port = transport.port in
+      let message =
+        buf_of_osc_message
+          ~address:"/serialosc/notify"
+          Osc.Types.[ String "127.0.0.1"; Int32 server_port ]
+      in
+      let recv_buf = Cstruct.create 1024 in
+      let rec loop need_notify =
+        if need_notify
+        then (
+          Net.send transport.socket ~dst:(`Udp (host, port)) [ message ];
+          recv transport.socket recv_buf)
+      and recv socket buff =
+        let _ = Net.recv socket buff in
+        let s = Cstruct.to_string buff in
+        match Osc.Codec.to_packet s with
+        | Ok packet ->
+          (match decode packet with
+           | Some (Added _ as event) ->
+             callback event;
+             loop true
+           | Some removed ->
+             callback removed;
+             loop false
+           | None -> loop false)
+        | Error _ -> loop false
+      in
+      loop true)
   ;;
 
   let enumerate_devices
@@ -196,15 +194,15 @@ module Monome = struct
     ?(port = serialosc_default_port)
     ()
     =
-    let* transport = Connection.find_free_port ~sw ~net in
+    let transport = Connection.find_free_port ~sw ~net in
     let addrs = Connection.string_of_addr transport.addr in
-    let serialosc_conn = Net.datagram_socket ~sw net @@ `Udp (host, port) in
+    let serialosc_conn = Net.datagram_socket ~sw net `UdpV4 in
     let list_devices =
       buf_of_osc_message
         ~address:"/serialosc/list"
         Osc.Types.[ String addrs; Int32 transport.port ]
     in
-    Net.send serialosc_conn [ list_devices ];
+    Net.send serialosc_conn ~dst:(`Udp (host, port)) [ list_devices ];
     let rec recv_device acc buf =
       let res =
         Fiber.first
@@ -222,7 +220,7 @@ module Monome = struct
       | Ok (Message message) when String.equal message.address "/serialosc/device" ->
         (match message.arguments with
          | String name :: String kind :: Int32 port :: _ ->
-           let kind = Option.value_exn @@ Kind.of_string kind
+           let kind = Option.value ~default:Kind.Grid @@ Kind.of_string kind
            and port = Int32.to_int_trunc port in
            let device = Device.create ~name kind ~addr ~port in
            recv_device (device :: acc) buf
@@ -234,7 +232,6 @@ module Monome = struct
   ;;
 
   type error =
-    | Transport of string
     | Osc of [ `Missing_typetag_string | `Unsupported_typetag of char ]
     | Builder of Builder.setup
     | Incomplete
@@ -245,9 +242,7 @@ module Monome = struct
     =
     fun ~sw ~net ?(prefix = "/grid") device ->
     let Device.{ name; kind; addr; _ } = device in
-    let* transport =
-      Connection.find_free_port ~sw ~net |> Result.map_error ~f:(fun e -> Transport e)
-    in
+    let transport = Connection.find_free_port ~sw ~net in
     let device_connection = Net.datagram_socket ~sw net @@ addr in
     let msg =
       buf_of_osc_message ~address:"/sys/port" Osc.Types.[ Int32 transport.port ]
@@ -268,10 +263,10 @@ module Monome = struct
     let rec build builder =
       let response =
         Fiber.first
+          (fun () -> Net.recv transport.socket recvbuf |> fst |> Option.return)
           (fun () ->
             Eio_unix.sleep device_enumeration_timeout;
             None)
-          (fun () -> Net.recv transport.socket recvbuf |> fst |> Option.return)
       in
       match response with
       | Some _ ->
