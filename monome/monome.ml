@@ -60,8 +60,8 @@ module Kind = struct
     | Arc
 
   let of_string : string -> t option = function
+    | "monome 128" | "monome 64" | "monome 256" -> Some Grid
     | "arc" -> Some Arc
-    | "grid" -> Some Grid
     | _ -> None
   ;;
 end
